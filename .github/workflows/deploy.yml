@@ -9,7 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      TF_VAR_bucket_name: ${{ secrets.TF_VAR_bucket_name }}
+      TF_VAR_bucket_name: ${{ secrets.TF_VAR_BUCKET_NAME }}
 
     defaults:
       run:
@@ -51,7 +51,7 @@ jobs:
       - name: Sync files to S3
         if: steps.apply.outcome == 'success'
         run: |
-          aws s3 sync ../src s3://${{ secrets.TF_VAR_bucket_name }} --delete
+          aws s3 sync ../src s3://${{ secrets.TF_VAR_BUCKET_NAME }} --delete
         working-directory: . 
 
       - name: Invalidate CloudFront Cache
