@@ -61,10 +61,13 @@ jobs:
         id: get_distribution_id
         if: steps.apply.outcome == 'success'
         working-directory: ./terraform
-        run: terraform output -raw cloudfront_distribution_id | xargs -I {} echo "DIST_ID={}" >> $GITHUB_OUTPUT
+        run: |
+          ID=$(terraform output -raw cloudfront_distribution_id | grep -oE '^[A-Z0-9]+$')
+          echo "DIST_ID=$ID" >> $GITHUB_OUTPUT
 
-      # Step 2: Use the clean output from the previous step
+      # Step 2: Use the clean output from the previous step (NO CHANGE NEEDED HERE)
       - name: Invalidate CloudFront Cache
         if: steps.apply.outcome == 'success'
         run: |
           aws cloudfront create-invalidation --distribution-id ${{ steps.get_distribution_id.outputs.DIST_ID }} --paths "/*"
+
