@@ -56,9 +56,15 @@ jobs:
         run: |
           aws s3 sync ./src s3://${{ secrets.TF_VAR_BUCKET_NAME }} --delete
 
-      - name: Invalidate CloudFront Cache
+      # Step 1: Get the distribution ID and save it as an output
+      - name: Get CloudFront Distribution ID
+        id: get_distribution_id
         if: steps.apply.outcome == 'success'
         working-directory: ./terraform
+        run: echo "DIST_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
+
+      # Step 2: Use the clean output from the previous step
+      - name: Invalidate CloudFront Cache
+        if: steps.apply.outcome == 'success'
         run: |
-          DISTRIBUTION_ID=$(terraform output -raw cloudfront_distribution_id)
-          aws cloudfront create-invalidation --distribution-id $DISTRIBUTION_ID --paths "/*"
+          aws cloudfront create-invalidation --distribution-id ${{ steps.get_distribution_id.outputs.DIST_ID }} --paths "/*"
