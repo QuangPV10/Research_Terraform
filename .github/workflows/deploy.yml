@@ -49,25 +49,29 @@ jobs:
         run: terraform apply -auto-approve
         working-directory: ./terraform
 
+      # === BƯỚC GỠ LỖI MỚI ===
+      # In ra toàn bộ output để kiểm tra giá trị
+      - name: Debug Terraform Outputs
+        if: always() # Luôn chạy bước này để kiểm tra
+        working-directory: ./terraform
+        run: |
+          echo "--- ALL TERRAFORM OUTPUTS ---"
+          terraform output
+          echo "---------------------------"
+
       - name: Sync files to S3
         if: steps.apply.outcome == 'success'
-        # Run from the root directory to correctly find the 'src' folder
         working-directory: ./
         run: |
           aws s3 sync ./src s3://${{ secrets.TF_VAR_BUCKET_NAME }} --delete
 
-      # Step 1: Get the distribution ID and save it as an output
       - name: Get CloudFront Distribution ID
         id: get_distribution_id
         if: steps.apply.outcome == 'success'
         working-directory: ./terraform
-        run: |
-          ID=$(terraform output -raw cloudfront_distribution_id | grep -oE '^[A-Z0-9]+$' || true)
-          echo "DIST_ID=$ID" >> $GITHUB_OUTPUT
+        run: echo "DIST_ID=$(terraform output -raw cloudfront_distribution_id)" >> $GITHUB_OUTPUT
 
-      # Step 2: Use the clean output from the previous step (NO CHANGE NEEDED HERE)
       - name: Invalidate CloudFront Cache
         if: steps.apply.outcome == 'success'
         run: |
           aws cloudfront create-invalidation --distribution-id ${{ steps.get_distribution_id.outputs.DIST_ID }} --paths "/*"
-
