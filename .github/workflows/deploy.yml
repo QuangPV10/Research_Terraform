@@ -62,7 +62,7 @@ jobs:
         if: steps.apply.outcome == 'success'
         working-directory: ./terraform
         run: |
-          ID=$(terraform output -raw cloudfront_distribution_id | grep -oE '^[A-Z0-9]+$')
+          ID=$(terraform output -raw cloudfront_distribution_id | grep -oE '^[A-Z0-9]+$' || true)
           echo "DIST_ID=$ID" >> $GITHUB_OUTPUT
 
       # Step 2: Use the clean output from the previous step (NO CHANGE NEEDED HERE)
