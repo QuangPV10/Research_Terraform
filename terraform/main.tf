@@ -2,7 +2,7 @@ provider "aws" {
   region = var.aws_region
 }
 
-# 1. S3 bucket giờ sẽ là private
+# 1. S3 bucket là private
 resource "aws_s3_bucket" "website_bucket" {
   bucket = var.bucket_name
   tags = {
@@ -11,10 +11,7 @@ resource "aws_s3_bucket" "website_bucket" {
   }
 }
 
-# KHÔNG cần resource "aws_s3_bucket_website_configuration" nữa vì bucket là private.
-# KHÔNG cần resource "aws_s3_bucket_public_access_block" vì mặc định đã block là điều ta muốn.
-
-# 2. Tạo Origin Access Control để cho phép CloudFront truy cập S3
+# 2. Tạo Origin Access Control (OAC) để cho phép CloudFront truy cập S3
 resource "aws_cloudfront_origin_access_control" "oac" {
   name                              = "OAC for ${var.bucket_name}"
   description                       = "Origin Access Control Policy"
@@ -23,14 +20,15 @@ resource "aws_cloudfront_origin_access_control" "oac" {
   signing_protocol                  = "sigv4"
 }
 
-# 3. Sửa lại Bucket Policy để chỉ cho phép CloudFront
+# 3. SỬA LỖI TẠI ĐÂY: Bucket Policy phải cho phép CloudFront Distribution
+# Chính sách này chỉ cho phép CloudFront distribution được liên kết đọc các đối tượng.
 resource "aws_s3_bucket_policy" "bucket_policy" {
   bucket = aws_s3_bucket.website_bucket.id
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Sid       = "AllowCloudFrontOAC"
+        Sid       = "AllowCloudFrontServicePrincipal"
         Effect    = "Allow"
         Principal = {
           Service = "cloudfront.amazonaws.com"
@@ -39,7 +37,7 @@ resource "aws_s3_bucket_policy" "bucket_policy" {
         Resource  = "${aws_s3_bucket.website_bucket.arn}/*"
         Condition = {
           StringEquals = {
-            # Chỉ cho phép truy cập từ CloudFront distribution này
+            # Điều kiện quan trọng: Chỉ cho phép truy cập từ CloudFront distribution này
             "AWS:SourceArn" = aws_cloudfront_distribution.s3_distribution.arn
           }
         }
@@ -56,15 +54,15 @@ resource "aws_cloudfront_distribution" "s3_distribution" {
   origin {
     domain_name              = aws_s3_bucket.website_bucket.bucket_regional_domain_name
     origin_id                = "S3-${var.bucket_name}"
-    # Thêm dòng này để kết nối với OAC
+    # Kết nối CloudFront với OAC
     origin_access_control_id = aws_cloudfront_origin_access_control.oac.id
   }
 
   default_cache_behavior {
-    # Giữ nguyên các cấu hình khác
-    allowed_methods        = ["GET", "HEAD"]
-    cached_methods         = ["GET", "HEAD"]
-    target_origin_id       = "S3-${var.bucket_name}"
+    allowed_methods  = ["GET", "HEAD"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "S3-${var.bucket_name}"
+    
     viewer_protocol_policy = "redirect-to-https"
 
     forwarded_values {
